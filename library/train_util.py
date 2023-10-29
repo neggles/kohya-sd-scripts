@@ -542,6 +542,8 @@ class BaseDataset(torch.utils.data.Dataset):
         max_token_length: int,
         resolution: Optional[Tuple[int, int]],
         debug_dataset: bool,
+        token_sep: str = ",",
+        token_word_sep: str = " ",
     ) -> None:
         super().__init__()
 
@@ -553,6 +555,10 @@ class BaseDataset(torch.utils.data.Dataset):
         self.debug_dataset = debug_dataset
 
         self.subsets: List[Union[DreamBoothSubset, FineTuningSubset]] = []
+
+        # caption handling
+        self.token_sep = token_sep + " " if token_sep == "," else token_sep
+        self.token_word_sep = token_word_sep
 
         self.token_padding_disabled = False
         self.tag_frequency = {}
@@ -611,7 +617,7 @@ class BaseDataset(torch.utils.data.Dataset):
         frequency_for_dir = self.tag_frequency.get(dir_name, {})
         self.tag_frequency[dir_name] = frequency_for_dir
         for caption in captions:
-            for tag in caption.split(","):
+            for tag in caption.split(self.token_sep):
                 tag = tag.strip()
                 if tag:
                     tag = tag.lower()
@@ -680,7 +686,13 @@ class BaseDataset(torch.utils.data.Dataset):
 
                 flex_tokens = dropout_tags(flex_tokens)
 
-                caption = ", ".join(fixed_tokens + flex_tokens)
+                # replace spaces with token_word_sep in each token/tag
+                if self.token_word_sep != " ":
+                    fixed_tokens = [x.replace(" ", self.token_word_sep) for x in fixed_tokens]
+                    flex_tokens = [x.replace(" ", self.token_word_sep) for x in flex_tokens]
+
+                # join tokens/tags into a string
+                caption = self.token_sep.join(fixed_tokens + flex_tokens)
 
             # textual inversion対応
             for str_from, str_to in self.replacements.items():
@@ -1372,8 +1384,9 @@ class DreamBoothDataset(BaseDataset):
         bucket_no_upscale: bool,
         prior_loss_weight: float,
         debug_dataset,
+        **kwargs,
     ) -> None:
-        super().__init__(tokenizer, max_token_length, resolution, debug_dataset)
+        super().__init__(tokenizer, max_token_length, resolution, debug_dataset, **kwargs)
 
         assert resolution is not None, "resolution is required / resolution（解像度）指定は必須です"
 
@@ -1546,9 +1559,9 @@ class FineTuningDataset(BaseDataset):
         max_bucket_reso: int,
         bucket_reso_steps: int,
         bucket_no_upscale: bool,
-        debug_dataset,
+        **kwargs,
     ) -> None:
-        super().__init__(tokenizer, max_token_length, resolution, debug_dataset)
+        super().__init__(tokenizer, max_token_length, resolution, **kwargs)
 
         self.batch_size = batch_size
 
@@ -1758,9 +1771,9 @@ class ControlNetDataset(BaseDataset):
         max_bucket_reso: int,
         bucket_reso_steps: int,
         bucket_no_upscale: bool,
-        debug_dataset,
+        **kwargs,
     ) -> None:
-        super().__init__(tokenizer, max_token_length, resolution, debug_dataset)
+        super().__init__(tokenizer, max_token_length, resolution, **kwargs)
 
         db_subsets = []
         for subset in subsets:
@@ -3379,6 +3392,19 @@ def add_dataset_arguments(
         type=str,
         default=None,
         help="dataset class for arbitrary dataset (package.module.Class) / 任意のデータセットを用いるときのクラス名 (package.module.Class)",
+    )
+
+    parser.add_argument(
+        "--token_sep",
+        type=str,
+        default=",",
+        help="Separator character to use between tags",
+    )
+    parser.add_argument(
+        "--token_word_sep",
+        type=str,
+        default=",",
+        help="Separator character to use between words of a multi-word tag",
     )
 
     if support_caption_dropout:

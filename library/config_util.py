@@ -94,6 +94,8 @@ class BaseDatasetParams:
     max_token_length: int = None
     resolution: Optional[Tuple[int, int]] = None
     debug_dataset: bool = False
+    token_sep: str = ","
+    token_word_sep: str = " "
 
 
 @dataclass
@@ -503,6 +505,8 @@ def generate_dataset_group_by_blueprint(dataset_group_blueprint: DatasetGroupBlu
         max_bucket_reso: {dataset.max_bucket_reso}
         bucket_reso_steps: {dataset.bucket_reso_steps}
         bucket_no_upscale: {dataset.bucket_no_upscale}
+        token_sep: {dataset.token_sep},
+        token_word_sep: {dataset.token_word_sep},
       \n"""
                 ),
                 "  ",
